@@ -170,7 +170,7 @@ public class wclient {
             // latch on to port, if block == 1
 
             // Port check
-            if( replyDG.getPort() != destport) {
+            if( expected_block > 1 && replyDG.getPort() != destport) {
                 System.err.println("Wrong Port");
                 continue;
             }
@@ -190,8 +190,10 @@ public class wclient {
                 continue;
             }
 
+
+            // Latched
             if (data.blocknum() == 1) {
-                latchport = replyDG.getPort();
+                destport = replyDG.getPort();
             }
 
             // write data
