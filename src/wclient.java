@@ -20,7 +20,7 @@ public class wclient {
     static public void main(String args[]) {
         int srcport;
         int destport = wumppkt.SERVERPORT;
-        destport = wumppkt.SERVERPORT;		// 4716; server responds from same port
+        destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
         String filename = "vanilla";
         String desthost = "ulam.cs.luc.edu";
         int winsize = 1;
@@ -145,7 +145,7 @@ public class wclient {
 
             data = null; error = null;
             blocknum = 0;
-            if (  proto == THEPROTO && opcode == wumppkt.DATAop && length >= wumppkt.DHEADERSIZE) {
+            if (  proto == THEPROTO && opcode == wumppkt.DATAop && length >= wumppkt.DHEADERSIZE ) {
                 data = new wumppkt.DATA(replybuf, length);
                 blocknum = data.blocknum();
             } else if ( proto == THEPROTO && opcode == wumppkt.ERRORop && length >= wumppkt.EHEADERSIZE) {
@@ -169,6 +169,31 @@ public class wclient {
             // check port, packet size, type, block, etc
             // latch on to port, if block == 1
 
+            // Port check
+            if( replyDG.getPort() != destport) {
+                System.err.println("Wrong Port");
+                continue;
+            }
+
+            // Packet size
+            if (length < wumppkt.DHEADERSIZE) {
+                continue;
+            }
+
+            // block_num check
+            if (data.blocknum() != expected_block) {
+                continue;
+            }
+
+            // Type check
+            if (opcode != wumppkt.DATAop) {
+                continue;
+            }
+
+            if (data.blocknum() == 1) {
+                latchport = replyDG.getPort();
+            }
+
             // write data
             System.out.write(data.bytes(), 0, data.size() - wumppkt.DHEADERSIZE);
 
@@ -183,8 +208,10 @@ public class wclient {
                 System.err.println("send() failed");
                 return;
             }
-            sendtime = System.currentTimeMillis();
             expected_block++;
+            if (length < 512) {
+
+            }
 
         } // while
     }
