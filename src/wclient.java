@@ -122,6 +122,7 @@ public class wclient {
             catch (SocketTimeoutException ste) {
                 System.err.println("hard timeout");
                 // what do you do here??; retransmit of previous packet here
+                // Send previous ACK
                 return;
                 //continue;
             }
@@ -210,6 +211,7 @@ public class wclient {
                 System.err.println("send() failed");
                 return;
             }
+            sendtime = System.currentTimeMillis();
             expected_block++;
             if (length < 512) {
 
