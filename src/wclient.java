@@ -20,7 +20,7 @@ public class wclient {
     static public void main(String args[]) {
         int srcport;
         int destport = wumppkt.SERVERPORT;
-        destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
+        destport = wumppkt.SERVERPORT;		// 4716; server responds from same port
         String filename = "vanilla";
         String desthost = "ulam.cs.luc.edu";
         int winsize = 1;
