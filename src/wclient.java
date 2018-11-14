@@ -20,7 +20,7 @@ public class wclient {
     static public void main(String args[]) {
         int srcport;
         int destport = wumppkt.SERVERPORT;
-        destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
+        //destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
         String filename = "vanilla";
         String desthost = "ulam.cs.luc.edu";
         int winsize = 1;
@@ -76,6 +76,8 @@ public class wclient {
             System.err.println("send() failed");
             return;
         }
+        long starttime = System.currentTimeMillis();
+        long sendtime = starttime;
 
         //============================================================
 
@@ -87,8 +89,6 @@ public class wclient {
         ackDG.setPort(destport);		// this is wrong for wumppkt.SERVERPORT version
 
         int expected_block = 1;
-        long starttime = System.currentTimeMillis();
-        long sendtime = starttime;
 
         wumppkt.DATA  data  = null;
         wumppkt.ERROR error = null;
@@ -181,20 +181,20 @@ public class wclient {
                 continue;
             }
 
-            // block_num check
-            if (data.blocknum() != expected_block) {
-                continue;
-            }
-
             // Type check
             if (opcode != wumppkt.DATAop) {
                 continue;
             }
 
+            // block_num check
+            if (data.blocknum() != expected_block) {
+                continue;
+            }
 
             // Latched
             if (data.blocknum() == 1) {
                 destport = replyDG.getPort();
+                latchport = destport;
             }
 
             // write data
@@ -214,7 +214,7 @@ public class wclient {
             sendtime = System.currentTimeMillis();
             expected_block++;
             if (length < 512) {
-
+                destport = 0;
             }
 
         } // while
