@@ -38,7 +38,7 @@ public class wumppkt {
     public static final short SERVERPORT = 4715;
     public static final short SAMEPORT   = 4716;
 
-    public static final int   INITTIMEOUT = 3000;   // milliseconds
+    public static final int   INITTIMEOUT = 1000;   // milliseconds
     public static final int   SHORTSIZE = 2;            // in bytes
     public static final int   INTSIZE   = 4;
     public static final int   BASESIZE  = 2;

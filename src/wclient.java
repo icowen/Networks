@@ -21,7 +21,10 @@ public class wclient {
         int srcport;
         int destport = wumppkt.SERVERPORT;
         destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
-        String filename = "lose2";
+        String filename = "vanilla";
+        //String filename = "lose2";
+        //String filename = "spray";
+        //String filename = "dup2";
         String desthost = "ulam.cs.luc.edu";
         int winsize = 1;
         int latchport = 0;
@@ -118,9 +121,8 @@ public class wclient {
 
         while (true) {
             // get packet
-            if(System.currentTimeMillis() - sendtime > 3000 || expected_block != blocknum) {
+            if(System.currentTimeMillis() - sendtime > 3000 && expected_block != blocknum) {
                 try {
-                    System.out.println("here");
                     s.send(lastSent);
                     sendtime = System.currentTimeMillis();
                 }
@@ -133,10 +135,9 @@ public class wclient {
                 s.receive(replyDG);
             }
             catch (SocketTimeoutException ste) {
-                System.err.println("hard timeout");
                 // what do you do here??; retransmit of previous packet here
                 // Send previous ACK
-                return;
+                continue;
                 //continue;
             }
             catch (IOException ioe) {
@@ -173,10 +174,6 @@ public class wclient {
             //write data, increment expected_block
             // exit if data size is < 512
 
-            if (error != null) {
-                System.err.println("Error packet rec'd; code " + error.errcode());
-                continue;
-            }
             if (data == null) continue;		// typical error check, but you should
 
             // The following is for you to do:
@@ -186,6 +183,7 @@ public class wclient {
             // Port check
             if( expected_block > 1 && replyDG.getPort() != destport) {
                 System.err.println("Wrong Port");
+                error = new wumppkt.ERROR(wumppkt.EBADPORT, replybuf);
                 continue;
             }
 
@@ -194,13 +192,25 @@ public class wclient {
                 continue;
             }
 
+            // Proto Check
+            if (proto != THEPROTO) {
+                error = new wumppkt.ERROR(wumppkt.EBADPROTO, replybuf);
+                continue;
+            }
+
             // Type check
             if (opcode != wumppkt.DATAop) {
+                error = new wumppkt.ERROR(wumppkt.EBADOPCODE, replybuf);
                 continue;
             }
 
             // block_num check
             if (blocknum != expected_block) {
+                continue;
+            }
+
+            if (error != null) {
+                System.err.println("Error packet rec'd; code " + error.errcode());
                 continue;
             }
 
@@ -226,11 +236,24 @@ public class wclient {
             }
             sendtime = System.currentTimeMillis();
             expected_block++;
+            //Dallying State
             if (length < wumppkt.MAXDATASIZE) {
-                System.err.println("Packet recieved less then 512");
-                return;
+                System.err.println("Packet received less then 512");
+                System.err.println("Dallying State");
+                while (System.currentTimeMillis()-sendtime < wumppkt.INITTIMEOUT *2) {
+                    try {
+                        s.receive(replyDG);
+                    }
+                    catch (SocketTimeoutException ste) {
+                        System.err.println("No final data packet received- Connection ending...");
+                        return;
+                    }
+                    catch (IOException ioe) {
+                        System.err.println("receive() failed");
+                        return;
+                    }
+                }
             }
-
         } // while
     }
 
