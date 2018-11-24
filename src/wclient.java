@@ -20,8 +20,8 @@ public class wclient {
     static public void main(String args[]) {
         int srcport;
         int destport = wumppkt.SERVERPORT;
-        //destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
-        String filename = "vanilla";
+        destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
+        String filename = "lose2";
         String desthost = "ulam.cs.luc.edu";
         int winsize = 1;
         int latchport = 0;
@@ -69,10 +69,12 @@ public class wclient {
 
         System.err.println("req size = " + req.size() + ", filename=" + req.filename());
 
+        DatagramPacket lastSent;            // we don't set the address here!
         DatagramPacket reqDG
                 = new DatagramPacket(req.write(), req.size(), dest, destport);
-        try {s.send(reqDG);}
-        catch (IOException ioe) {
+        try {   s.send(reqDG);
+                lastSent = reqDG;
+        } catch (IOException ioe) {
             System.err.println("send() failed");
             return;
         }
@@ -97,7 +99,7 @@ public class wclient {
         int proto;        // for proto of incoming packets
         int opcode;
         int length;
-        int blocknum;
+        int blocknum = 0;
 
         //====== HUMP =====================================================
 
@@ -116,6 +118,17 @@ public class wclient {
 
         while (true) {
             // get packet
+            if(System.currentTimeMillis() - sendtime > 3000 || expected_block != blocknum) {
+                try {
+                    System.out.println("here");
+                    s.send(lastSent);
+                    sendtime = System.currentTimeMillis();
+                }
+                catch (IOException ioe) {
+                    System.err.println("send() failed");
+                }
+            }
+
             try {
                 s.receive(replyDG);
             }
@@ -187,14 +200,13 @@ public class wclient {
             }
 
             // block_num check
-            if (data.blocknum() != expected_block) {
+            if (blocknum != expected_block) {
                 continue;
             }
 
             // Latched
             if (data.blocknum() == 1) {
                 destport = replyDG.getPort();
-                latchport = destport;
             }
 
             // write data
@@ -206,15 +218,17 @@ public class wclient {
             ackDG.setLength(ack.size());
             ackDG.setPort(srcport);
             //ackDG.setPort(??);
-            try {s.send(ackDG);}
-            catch (IOException ioe) {
+            try {   s.send(ackDG);
+                    lastSent = ackDG;
+            } catch (IOException ioe) {
                 System.err.println("send() failed");
                 return;
             }
             sendtime = System.currentTimeMillis();
             expected_block++;
-            if (length < 512) {
-                destport = 0;
+            if (length < wumppkt.MAXDATASIZE) {
+                System.err.println("Packet recieved less then 512");
+                return;
             }
 
         } // while
@@ -225,7 +239,7 @@ public class wclient {
         byte[] replybuf = pkt.getData();
         int proto = wumppkt.proto(replybuf);
         int opcode = wumppkt.opcode(replybuf);
-        int length = replybuf.length;
+        int length = data.data().length;
         // the following seven items we can print always
         System.err.print("rec'd packet: len=" + length);
         System.err.print("; proto=" + proto);
