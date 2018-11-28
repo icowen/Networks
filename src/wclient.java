@@ -20,11 +20,20 @@ public class wclient {
     static public void main(String args[]) {
         int srcport;
         int destport = wumppkt.SERVERPORT;
-        destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
+        //destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
         String filename = "vanilla";
-        //String filename = "lose2";
-        //String filename = "spray";
-        //String filename = "dup2";
+//        String filename = "lose2";
+//        String filename = "spray";
+//        String filename = "dup2";
+//        String filename = "lose";
+//        String filename = "delay";
+//        String filename = "reorder";
+//        String filename = "dupdata2";
+//        String filename = "losedata2";
+//        String filename = "marspacket";
+//        String filename = "badopcode";
+//        String filename = "nofile";
+
         String desthost = "ulam.cs.luc.edu";
         int winsize = 1;
         int latchport = 0;
@@ -95,14 +104,15 @@ public class wclient {
 
         int expected_block = 1;
 
-        wumppkt.DATA  data  = null;
-        wumppkt.ERROR error = null;
-        wumppkt.ACK   ack   = new wumppkt.ACK(0);
+        wumppkt.DATA  data;
+        wumppkt.ERROR error;
+        wumppkt.ACK   ack;
 
-        int proto;        // for proto of incoming packets
+        int proto = THEPROTO;        // for proto of incoming packets
         int opcode;
         int length;
         int blocknum = 0;
+        int noFileAttempts = 0;
 
         //====== HUMP =====================================================
 
@@ -121,10 +131,17 @@ public class wclient {
 
         while (true) {
             // get packet
-            if(System.currentTimeMillis() - sendtime > 3000 && expected_block != blocknum) {
+            if(System.currentTimeMillis() - sendtime > wumppkt.INITTIMEOUT && expected_block != blocknum) {
+                if(noFileAttempts > 3) {
+                    error = new wumppkt.ERROR((short)proto, (short)wumppkt.ENOFILE);
+                    System.err.println("No File Error");
+                    return;
+                }
                 try {
+                    System.err.println("Soft timeout- retransmitting last sent packet");
                     s.send(lastSent);
                     sendtime = System.currentTimeMillis();
+                    if(expected_block == 1) noFileAttempts++;
                 }
                 catch (IOException ioe) {
                     System.err.println("send() failed");
@@ -160,57 +177,52 @@ public class wclient {
 
             data = null; error = null;
             blocknum = 0;
-            if (  proto == THEPROTO && opcode == wumppkt.DATAop && length >= wumppkt.DHEADERSIZE ) {
+
+            // Proto Check
+            if (proto != THEPROTO) {
+                error = new wumppkt.ERROR(wumppkt.EBADPROTO, replybuf);
+            }
+
+            // Port check
+            if( expected_block > 1 && replyDG.getPort() != destport) {
+                System.err.println("Wrong Port");
+                error = new wumppkt.ERROR((short)proto, (short)wumppkt.EBADPORT);
+            }
+
+            // Packet size check
+            if (length < wumppkt.DHEADERSIZE) {
+                continue;
+            }
+
+            // opcode Check
+            if (  opcode == wumppkt.DATAop ) {              //Data packet
                 data = new wumppkt.DATA(replybuf, length);
                 blocknum = data.blocknum();
-            } else if ( proto == THEPROTO && opcode == wumppkt.ERRORop && length >= wumppkt.EHEADERSIZE) {
+            } else if (  opcode == wumppkt.ERRORop ) {      //Error packet
                 error = new wumppkt.ERROR(replybuf);
             }
 
+            if (error != null) {
+                System.err.println("Error packet rec'd; code " + error.errcode());
+                continue;
+            }
+
+            if (data == null) continue;		// typical error check, but you should
             printInfo(replyDG, data, starttime);
 
             // now check the packet for appropriateness
             // if it passes all the checks:
-            //write data, increment expected_block
+            // write data, increment expected_block
             // exit if data size is < 512
-
-            if (data == null) continue;		// typical error check, but you should
 
             // The following is for you to do:
             // check port, packet size, type, block, etc
             // latch on to port, if block == 1
 
-            // Port check
-            if( expected_block > 1 && replyDG.getPort() != destport) {
-                System.err.println("Wrong Port");
-                error = new wumppkt.ERROR(wumppkt.EBADPORT, replybuf);
-                continue;
-            }
-
-            // Packet size
-            if (length < wumppkt.DHEADERSIZE) {
-                continue;
-            }
-
-            // Proto Check
-            if (proto != THEPROTO) {
-                error = new wumppkt.ERROR(wumppkt.EBADPROTO, replybuf);
-                continue;
-            }
-
-            // Type check
-            if (opcode != wumppkt.DATAop) {
-                error = new wumppkt.ERROR(wumppkt.EBADOPCODE, replybuf);
-                continue;
-            }
-
             // block_num check
             if (blocknum != expected_block) {
-                continue;
-            }
-
-            if (error != null) {
-                System.err.println("Error packet rec'd; code " + error.errcode());
+                System.err.println("Received incorrect packet. Expecting: "+
+                        expected_block+ ". Got: "+blocknum);
                 continue;
             }
 
@@ -227,7 +239,6 @@ public class wclient {
             ackDG.setData(ack.write());
             ackDG.setLength(ack.size());
             ackDG.setPort(srcport);
-            //ackDG.setPort(??);
             try {   s.send(ackDG);
                     lastSent = ackDG;
             } catch (IOException ioe) {
@@ -236,6 +247,7 @@ public class wclient {
             }
             sendtime = System.currentTimeMillis();
             expected_block++;
+
             //Dallying State
             if (length < wumppkt.MAXDATASIZE) {
                 System.err.println("Packet received less then 512");
