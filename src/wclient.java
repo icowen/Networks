@@ -255,22 +255,35 @@ public class wclient {
                 while (System.currentTimeMillis()-sendtime < wumppkt.INITTIMEOUT *2) {
                     try {
                         s.receive(replyDG);
-                    }
-                    catch (SocketTimeoutException ste) {
-                        System.err.println("No final data packet received- Connection ending...");
-                        return;
-                    }
-                    catch (IOException ioe) {
+                    } catch (SocketTimeoutException ste) {
+                        System.err.println("No packet received, checking again.");
+                    } catch (IOException ioe) {
                         System.err.println("receive() failed");
                         return;
                     }
+
+                    if(replyDG.getPort() == srcport &&
+                            getblock(replyDG.getData()) == expected_block) {
+                        try {
+                            s.send(lastSent);
+                            sendtime = System.currentTimeMillis();
+                        } catch (IOException ioe) {
+                            System.err.println("send() failed");
+                            return;
+                        }
+
+                    }
+
                 }
+                System.err.println("No final data packet received- Connection ending...");
+                s.disconnect();
+                return;
             }
         } // while
     }
 
     // print packet length, protocol, opcode, source address/port, time, blocknum
-    static public void printInfo(DatagramPacket pkt, wumppkt.DATA data, long starttime) {
+    static private void printInfo(DatagramPacket pkt, wumppkt.DATA data, long starttime) {
         byte[] replybuf = pkt.getData();
         int proto = wumppkt.proto(replybuf);
         int opcode = wumppkt.opcode(replybuf);
