@@ -21,7 +21,7 @@ public class wclient {
         int srcport;
         int destport = wumppkt.SERVERPORT;
         //destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
-        String filename = "vanilla";
+//        String filename = "vanilla";
 //        String filename = "lose2";
 //        String filename = "spray";
 //        String filename = "dup2";
@@ -30,7 +30,7 @@ public class wclient {
 //        String filename = "reorder";
 //        String filename = "dupdata2";
 //        String filename = "losedata2";
-//        String filename = "marspacket";
+        String filename = "marspacket";
 //        String filename = "badopcode";
 //        String filename = "nofile";
 
@@ -184,7 +184,7 @@ public class wclient {
             }
 
             // Port check
-            if( expected_block > 1 && replyDG.getPort() != destport) {
+            if( expected_block > 1 && replyDG.getPort() != latchport) {
                 System.err.println("Wrong Port");
                 error = new wumppkt.ERROR((short)proto, (short)wumppkt.EBADPORT);
             }
@@ -228,7 +228,7 @@ public class wclient {
 
             // Latched
             if (data.blocknum() == 1) {
-                destport = replyDG.getPort();
+                latchport = replyDG.getPort();
             }
 
             // write data
