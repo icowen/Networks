@@ -20,8 +20,8 @@ public class wclient {
     static public void main(String args[]) {
         int srcport;
         int destport = wumppkt.SERVERPORT;
-        //destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
-//        String filename = "vanilla";
+//        destport = wumppkt.SAMEPORT;		// 4716; server responds from same port
+        String filename = "vanilla";
 //        String filename = "lose2";
 //        String filename = "spray";
 //        String filename = "dup2";
@@ -30,7 +30,7 @@ public class wclient {
 //        String filename = "reorder";
 //        String filename = "dupdata2";
 //        String filename = "losedata2";
-        String filename = "marspacket";
+//        String filename = "marspacket";
 //        String filename = "badopcode";
 //        String filename = "nofile";
 
@@ -99,8 +99,11 @@ public class wclient {
         DatagramPacket replyDG            // we don't set the address here!
                 = new DatagramPacket(new byte[wumppkt.MAXSIZE] , wumppkt.MAXSIZE);
         DatagramPacket ackDG = new DatagramPacket(new byte[0], 0);
+        DatagramPacket errorDG = new DatagramPacket(new byte[0], 0);
         ackDG.setAddress(dest);
         ackDG.setPort(destport);		// this is wrong for wumppkt.SERVERPORT version
+        errorDG.setAddress(dest);
+        errorDG.setPort(destport);
 
         int expected_block = 1;
 
@@ -112,7 +115,6 @@ public class wclient {
         int opcode;
         int length;
         int blocknum = 0;
-        int noFileAttempts = 0;
 
         //====== HUMP =====================================================
 
@@ -132,16 +134,10 @@ public class wclient {
         while (true) {
             // get packet
             if(System.currentTimeMillis() - sendtime > wumppkt.INITTIMEOUT && expected_block != blocknum) {
-                if(noFileAttempts > 3) {
-                    error = new wumppkt.ERROR((short)proto, (short)wumppkt.ENOFILE);
-                    System.err.println("No File Error");
-                    return;
-                }
                 try {
                     System.err.println("Soft timeout- retransmitting last sent packet");
                     s.send(lastSent);
                     sendtime = System.currentTimeMillis();
-                    if(expected_block == 1) noFileAttempts++;
                 }
                 catch (IOException ioe) {
                     System.err.println("send() failed");
@@ -180,6 +176,7 @@ public class wclient {
 
             // Proto Check
             if (proto != THEPROTO) {
+                System.out.println("Wrong Proto");
                 error = new wumppkt.ERROR(wumppkt.EBADPROTO, replybuf);
             }
 
@@ -191,7 +188,8 @@ public class wclient {
 
             // Packet size check
             if (length < wumppkt.DHEADERSIZE) {
-                continue;
+                System.err.println("No File Error");
+                error = new wumppkt.ERROR((short)proto, (short)wumppkt.ENOFILE);
             }
 
             // opcode Check
@@ -200,10 +198,24 @@ public class wclient {
                 blocknum = data.blocknum();
             } else if (  opcode == wumppkt.ERRORop ) {      //Error packet
                 error = new wumppkt.ERROR(replybuf);
+            } else {
+                System.out.println("Bad op code");
+                error = new wumppkt.ERROR((short)proto, (short)wumppkt.EBADOPCODE);
             }
 
+            //Send error packet if there is one
             if (error != null) {
+                errorDG.setData(error.write());
+                errorDG.setLength(error.size());
+                errorDG.setPort(srcport);
+                try {
+                    s.send(errorDG);
+                } catch (IOException ioe) {
+                    System.err.println("send() failed");
+                    return;
+                }
                 System.err.println("Error packet rec'd; code " + error.errcode());
+                if(error.errcode() == 4) return;    //End connection if no file error
                 continue;
             }
 
@@ -276,7 +288,6 @@ public class wclient {
 
                 }
                 System.err.println("No final data packet received- Connection ending...");
-                s.disconnect();
                 return;
             }
         } // while
